@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Timer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:#000;color:#fff;overflow:hidden;height:100vh;height:100dvh}
+#bgBtn{position:fixed;top:12px;right:12px;z-index:100;width:38px;height:38px;border-radius:8px;border:2px solid #fff;background:#111;color:#fff;font-size:18px;cursor:pointer}
+#home{height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:16px}
+#home input{width:100%;max-width:340px;padding:16px;border:none;border-radius:14px;background:#1a1a1a;color:#fff;font-size:18px;text-align:center;outline:none}
+#home input::placeholder{color:#888}
+#timeRow{display:flex;gap:12px;width:100%;max-width:340px}
+#timeRow input{flex:1}
+#startBtn{width:100%;max-width:340px;padding:18px;border:none;border-radius:14px;background:#4da6ff;color:#fff;font-size:22px;font-weight:bold;cursor:pointer}
+#game{display:none;height:100dvh;flex-direction:column;background:#000}
+#topBar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}
+#topBtns{display:flex;gap:10px}
+#topBtns button{background:#000;color:#fff;border:1px solid #fff;padding:10px 16px;border-radius:10px;font-size:15px;font-weight:bold;cursor:pointer}
+#names{font-size:16px;color:#aaa}
+#pixelWrap{flex:1;display:flex;align-items:center;justify-content:center;padding:0 10px;direction:ltr}
+#pixelTimer{display:flex;gap:2vw;align-items:center;justify-content:center;width:100%}
+.digit{display:grid;grid-template-columns:repeat(4,1fr);gap:0.6vw;width:13vw}
+.colon{display:flex;flex-direction:column;gap:2.8vw;align-items:center}
+.dot{width:2vw;height:2vw;background:#ffffff;border-radius:2px;opacity:1;box-shadow:0 0 12px rgba(255,255,255,1);filter:brightness(1.5)}
+.px{aspect-ratio:1;background:transparent;border-radius:2px}
+.px.on{background:#ffffff;box-shadow:0 0 12px rgba(255,255,255,1);opacity:1;filter:brightness(1.5)}
+#endScreen{display:none;height:100dvh;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;gap:24px;background:#000}
+#endText{font-size:32px;line-height:1.5;font-weight:bold}
+#backHome{padding:16px 30px;border:none;border-radius:14px;background:#4da6ff;color:#fff;font-size:19px;font-weight:bold;cursor:pointer}
+</style>
+</head>
+<body>
+<button id="bgBtn" onclick="changeBg()">◐</button>
+<div id="home">
+<input id="userName" placeholder="Enter username">
+<input id="subjectName" placeholder="Enter subject">
+<div id="timeRow">
+<input id="hoursIn" type="number" min="0" max="12" placeholder="Hours">
+<input id="minsIn" type="number" min="0" max="59" placeholder="Minutes">
+</div>
+<button id="startBtn" type="button">START</button>
+</div>
+<div id="game">
+<div id="topBar">
+<div id="names"></div>
+<div id="topBtns">
+<button onclick="goBack()">Back</button>
+<button id="stopBtn" onclick="togglePause()">Pause</button>
+<button onclick="finishTimer()">End</button>
+</div>
+</div>
+<div id="pixelWrap"><div id="pixelTimer"></div></div>
+</div>
+<div id="endScreen">
+<div id="endText"></div>
+<button id="backHome" onclick="goHomeFromEnd()">Back to Home</button>
+</div>
+<script>
+let total=0, left=0, timer=null, paused=false;
+let colors=['#000','#0a0a0a','#0d1a12','#0f0f1f']; let ci=0;
+const SENTENCES=["Have a nice day!","You did great today!","Proud of your focus!","Small steps, big results!","Your future self thanks you!","Keep going, you are closer than you think!","Great job, take a nice break!","You showed real discipline today!","Every minute you studied counts!","Well done, superstar!","Rest now, you earned it!","Today you proved you can do it!","Amazing focus, amazing you!","Keep shining, keep studying!","You are building your dreams!"];
+function changeBg(){ ci=(ci+1)%colors.length; document.body.style.background=colors[ci]; document.getElementById('game').style.background=colors[ci]; }
+const DIGITS={
+'0':[1,1,1,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,1,1],
+'1':[0,0,1,0,0,1,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,1,1,1],
+'2':[1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1],
+'3':[1,1,1,1,0,0,0,1,0,0,0,1,0,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1],
+'4':[1,0,0,1,1,0,0,1,1,0,0,1,1,1,1,1,0,0,0,1,0,0,0,1,0,0,0,1],
+'5':[1,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1],
+'6':[1,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1],
+'7':[1,1,1,1,0,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],
+'8':[1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1],
+'9':[1,1,1,1,1,0,0,1,1,0,0,1,1,1,1,1,0,0,0,1,0,0,0,1,1,1,1,1]
+};
+function fmt(s){ let h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60; return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0'); }
+function render(){
+let t=fmt(left); let html='';
+for(let ch of t){
+if(ch===':'){ html+='<div class="colon"><div class="dot"></div><div class="dot"></div></div>'; }
+else{ html+='<div class="digit">'; DIGITS[ch].forEach(v=>{ html+='<div class="px '+(v?'on':'')+'"></div>'; }); html+='</div>'; }
+}
+document.getElementById('pixelTimer').innerHTML=html;
+}
+function playBell(){
+try{
+let ctx=new (window.AudioContext||window.webkitAudioContext)();
+[0,0.8,1.6].forEach(d=>{
+let o=ctx.createOscillator(), g=ctx.createGain();
+o.type='sine'; o.frequency=880; g.gain.value=0;
+o.connect(g); g.connect(ctx.destination);
+let t=ctx.currentTime+d;
+g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.15,t+0.05); g.gain.exponentialRampToValueAtTime(0.001,t+0.7);
+o.start(t); o.stop(t+0.8);
+});
+}catch(e){}
+}
+function lockLandscape(){
+try{
+if(screen.orientation && screen.orientation.lock){
+screen.orientation.lock('landscape').catch(()=>{});
+}
+}catch(e){}
+}
+function unlockOrientation(){
+try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+}
+function startGame(){
+let h=parseInt(document.getElementById('hoursIn').value||0);
+let m=parseInt(document.getElementById('minsIn').value||0);
+let user=document.getElementById('userName').value||'';
+let sub=document.getElementById('subjectName').value||'';
+if(h===0 && m===0){ m=25; }
+total=(h*3600)+(m*60); left=total; paused=false;
+document.getElementById('stopBtn').innerText='Pause';
+document.getElementById('names').innerText=(user+'  '+sub).trim();
+document.getElementById('home').style.display='none';
+document.getElementById('endScreen').style.display='none';
+document.getElementById('bgBtn').style.display='none';
+document.getElementById('game').style.display='flex';
+render(); clearInterval(timer);
+timer=setInterval(()=>{ if(!paused){ left--; render(); if(left<=0){ clearInterval(timer); finishTimer(); } } },1000);
+lockLandscape();
+}
+document.getElementById('startBtn').addEventListener('click', startGame);
+function togglePause(){ paused=!paused; document.getElementById('stopBtn').innerText= paused ? 'Resume' : 'Pause'; }
+function goBack(){
+clearInterval(timer); unlockOrientation();
+document.getElementById('game').style.display='none';
+document.getElementById('home').style.display='flex';
+document.getElementById('bgBtn').style.display='block';
+}
+function finishTimer(){
+clearInterval(timer); playBell(); unlockOrientation();
+let r=SENTENCES[Math.floor(Math.random()*SENTENCES.length)];
+document.getElementById('endText').innerText=r;
+document.getElementById('game').style.display='none';
+document.getElementById('endScreen').style.display='flex';
+}
+function goHomeFromEnd(){
+document.getElementById('endScreen').style.display='none';
+document.getElementById('home').style.display='flex';
+document.getElementById('bgBtn').style.display='block';
+}
+render();
+</script>
+</body>
+</html>
